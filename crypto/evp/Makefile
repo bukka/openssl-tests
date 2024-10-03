@@ -5,7 +5,7 @@ OPENSSL_VERSIONS := ssl30 ssl31 ssl32 ssl33 ssl34 sslmaster
 DEFAULT_VERSION := ssl34
 
 # Programs to compile
-PROGRAMS := ocb_example ccm_example
+PROGRAMS := ocb
 
 # Source files (assumed to have one .c file per program)
 SRCS := $(patsubst %,%.c,$(PROGRAMS))
@@ -19,8 +19,8 @@ OPENSSL_VERSION := $(or $(VERSION),$(DEFAULT_VERSION))
 
 # OpenSSL paths
 OPENSSL_PREFIX := /usr/local/$(OPENSSL_VERSION)
-PKG_CONFIG_PATH := $(OPENSSL_PREFIX)/lib/pkgconfig
-LD_LIBRARY_PATH := $(OPENSSL_PREFIX)/lib
+PKG_CONFIG_PATH := $(OPENSSL_PREFIX)/lib64/pkgconfig
+LD_LIBRARY_PATH := $(OPENSSL_PREFIX)/lib64
 
 # Set OpenSSL library and include paths using pkg-config
 OPENSSL_CFLAGS := $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --cflags openssl)
