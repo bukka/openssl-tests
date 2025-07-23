@@ -1,11 +1,11 @@
 # List of OpenSSL versions
-OPENSSL_VERSIONS := ssl30 ssl31 ssl32 ssl33 ssl34 sslmaster
+OPENSSL_VERSIONS := ssl30 ssl31 ssl32 ssl33 ssl34 ssl35 sslmaster
 
 # Default OpenSSL version if not specified
-DEFAULT_VERSION := ssl34
+DEFAULT_VERSION := ssl35
 
 # Programs to compile
-PROGRAMS := ocb
+PROGRAMS := ocb dh-gen
 
 # Source files (assumed to have one .c file per program)
 SRCS := $(patsubst %,%.c,$(PROGRAMS))
