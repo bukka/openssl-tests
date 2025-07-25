@@ -5,7 +5,7 @@ OPENSSL_VERSIONS := ssl30 ssl31 ssl32 ssl33 ssl34 ssl35 sslmaster
 DEFAULT_VERSION := ssl35
 
 # Programs to compile
-PROGRAMS := ocb dh-gen
+PROGRAMS := ocb dh-gen cms-enc-rsa-padding
 
 # Source files (assumed to have one .c file per program)
 SRCS := $(patsubst %,%.c,$(PROGRAMS))
@@ -29,9 +29,13 @@ OPENSSL_LIBS := $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs ope
 # Target to build all programs
 all: $(PROGRAMS)
 
-# Rule to compile each program individually
+# Rule to compile each C program individually
 %: %.c
 	$(CC) $(CFLAGS) $(OPENSSL_CFLAGS) -o $@ $< $(OPENSSL_LIBS)
+
+# Rule to compile each C++ program individually
+%: %.cpp
+	$(CXX) $(CFLAGS) $(OPENSSL_CFLAGS) -o $@ $< $(OPENSSL_LIBS)
 
 # Target to run all programs
 run: $(PROGRAMS)
