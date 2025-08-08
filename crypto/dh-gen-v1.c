@@ -8,6 +8,9 @@
 #include <string.h>
 #include <stdlib.h>
 
+/* Forward declaration */
+void test_manual_128bit_generation(void);
+
 /* Simple ByteString structure for demonstration */
 typedef struct {
     unsigned char* data;
@@ -33,26 +36,25 @@ void bytestring_free(ByteString* bs) {
     bs->length = 0;
 }
 
-/* Count the number of bits (similar to SoftHSM's bits() method) */
+/* Count the number of bits - EXACT copy of SoftHSM's ByteString::bits() method */
 size_t bytestring_bits(const ByteString* bs) {
-    if (bs->length == 0) return 0;
-    
-    size_t totalBits = bs->length * 8;
-    
-    /* Find the most significant bit */
+    size_t bits = bs->length * 8;
+
+    if (bits == 0) return 0;
+
     for (size_t i = 0; i < bs->length; i++) {
-        if (bs->data[i] != 0) {
-            /* Count leading zeros in the first non-zero byte */
-            unsigned char byte = bs->data[i];
-            int leadingZeros = 0;
-            for (int bit = 7; bit >= 0; bit--) {
-                if (byte & (1 << bit)) break;
-                leadingZeros++;
+        unsigned char byte = bs->data[i];
+
+        for (unsigned char mask = 0x80; mask > 0; mask >>= 1) {
+            if ((byte & mask) == 0) {
+                bits--;
+            } else {
+                return bits;
             }
-            return totalBits - (i * 8) - leadingZeros;
         }
     }
-    return 0; /* All zeros */
+
+    return bits;
 }
 
 /* Print hex dump */
@@ -207,7 +209,15 @@ void debug_private_key_length(EVP_PKEY* dh_key) {
             bytestring_print_hex(&x_bytes, "X");
             
             printf("BN_num_bits(bn_priv_key): %d\n", BN_num_bits(bn_priv_key));
+            printf("BN_num_bytes(bn_priv_key): %d\n", BN_num_bytes(bn_priv_key));
             printf("ByteString.bits(): %zu (this is what SoftHSM reports)\n", bytestring_bits(&x_bytes));
+            
+            /* Show first few bytes in detail */
+            printf("First 8 bytes in detail: ");
+            for (size_t i = 0; i < 8 && i < x_bytes.length; i++) {
+                printf("%02x ", x_bytes.data[i]);
+            }
+            printf("\n");
             
             bytestring_free(&x_bytes);
         }
@@ -218,6 +228,17 @@ void debug_private_key_length(EVP_PKEY* dh_key) {
             printf("OSSL_PKEY_PARAM_DH_PRIV_LEN: %zu bits\n", priv_len);
         } else {
             printf("OSSL_PKEY_PARAM_DH_PRIV_LEN: not available\n");
+        }
+        
+        /* Try to get all DH parameters to understand what's happening */
+        BIGNUM* bn_p = NULL;
+        BIGNUM* bn_g = NULL;
+        if (EVP_PKEY_get_bn_param(dh_key, OSSL_PKEY_PARAM_FFC_P, &bn_p) &&
+            EVP_PKEY_get_bn_param(dh_key, OSSL_PKEY_PARAM_FFC_G, &bn_g)) {
+            printf("DH prime (p) bits: %d\n", BN_num_bits(bn_p));
+            printf("DH generator (g) bits: %d\n", BN_num_bits(bn_g));
+            BN_free(bn_p);
+            BN_free(bn_g);
         }
         
         BN_free(bn_priv_key);
@@ -258,6 +279,19 @@ void test_softhsm_scenario(void) {
             printf("Expected X bits: 128\n");
             printf("Actual X bits:   %zu\n", actual_bits);
             printf("Test %s\n", (actual_bits == 128) ? "PASSED" : "FAILED");
+            
+            /* If the test failed, let's understand why */
+            if (actual_bits != 128) {
+                printf("\nDEBUG: Why did the test fail?\n");
+                printf("- Private key has %zu bytes = %zu total bits\n", x_bytes.length, x_bytes.length * 8);
+                printf("- But only %zu significant bits (leading zeros stripped)\n", actual_bits);
+                printf("- This suggests OpenSSL 3.0+ providers may not respect OSSL_PKEY_PARAM_DH_PRIV_LEN\n");
+                printf("- Or the parameter is being applied differently than in OpenSSL 1.x\n");
+                
+                /* Check if we can force a 128-bit private key by generating it ourselves */
+                printf("\nTrying alternative approach: generate 128-bit random private key manually...\n");
+                test_manual_128bit_generation();
+            }
             printf("\n");
             
             bytestring_free(&x_bytes);
@@ -266,6 +300,38 @@ void test_softhsm_scenario(void) {
     }
     
     EVP_PKEY_free(dh_keypair);
+}
+
+void test_manual_128bit_generation(void) {
+    printf("=== Manual 128-bit Private Key Generation ===\n");
+    
+    /* Generate exactly 128 bits of random data */
+    unsigned char random_128bits[16]; /* 16 bytes = 128 bits */
+    if (RAND_bytes(random_128bits, 16) != 1) {
+        printf("Failed to generate random bytes\n");
+        return;
+    }
+    
+    /* Ensure the most significant bit is set to guarantee 128 bits */
+    random_128bits[0] |= 0x80;
+    
+    ByteString manual_x;
+    bytestring_init(&manual_x, 16);
+    memcpy(manual_x.data, random_128bits, 16);
+    
+    printf("Manually generated 128-bit private key:\n");
+    bytestring_print_hex(&manual_x, "Manual X");
+    printf("Manual X bits: %zu\n", bytestring_bits(&manual_x));
+    
+    /* Now try to create a DH key with this specific private key */
+    BIGNUM* bn_manual_x = byteString2bn(&manual_x);
+    if (bn_manual_x) {
+        printf("Successfully converted to BIGNUM with %d bits\n", BN_num_bits(bn_manual_x));
+        BN_free(bn_manual_x);
+    }
+    
+    bytestring_free(&manual_x);
+    printf("=====================================\n\n");
 }
 
 int main(void) {

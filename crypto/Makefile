@@ -5,7 +5,7 @@ OPENSSL_VERSIONS := ssl30 ssl31 ssl32 ssl33 ssl34 ssl35 sslmaster
 DEFAULT_VERSION := ssl35
 
 # Programs to compile
-PROGRAMS := ocb dh-gen cms-enc-rsa-padding
+PROGRAMS := ocb dh-gen-v1 dh-gen-v2 dh-gen-v3 cms-enc-rsa-padding
 
 # Source files (assumed to have one .c file per program)
 SRCS := $(patsubst %,%.c,$(PROGRAMS))
